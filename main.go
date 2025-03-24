@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// 数据表结构
+//数据表结构
 type Movie struct {
 	ID         uint      `gorm:"primaryKey"`
 	Name       string    `gorm:"type:varchar(255)"`
@@ -41,7 +41,6 @@ type Movie struct {
 	Plot       bool      `gorm:"type:tinyint(1)"`
 }
 
-// QueryParams 请求参数结构
 type QueryParams struct {
 	Order     string `form:"order"`
 	By        string `form:"by"`
@@ -72,10 +71,9 @@ type QueryParams struct {
 }
 
 func main() {
-	// 初始化Gin
 	r := gin.Default()
 
-	// 初始化数据库连接
+	//数据库连接
 	dsn := "root:@tcp(127.0.0.1:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -83,7 +81,7 @@ func main() {
 		return
 	}
 
-	// 注册路由
+	//注册路由
 	r.GET("/select", func(c *gin.Context) {
 		var params QueryParams
 		err := c.ShouldBindQuery(&params)
@@ -129,7 +127,7 @@ func main() {
 		//分页
 		query.Offset(params.Start).Limit(params.Num)
 
-		// 执行查询
+		//执行查询
 		var results []Movie
 		err = query.Find(&results).Error
 		if err != nil {
@@ -145,6 +143,6 @@ func main() {
 		})
 	})
 
-	// 启动服务
+	//启动服务
 	r.Run(":8082")
 }
