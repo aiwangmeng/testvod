@@ -1,19 +1,17 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"net/http"
+	"strings"
+	"time"
 )
 
-//数据表结构
+// 数据表结构
 type Movie struct {
 	ID         uint      `gorm:"primaryKey"`
 	Name       string    `gorm:"type:varchar(255)"`
@@ -68,6 +66,7 @@ type QueryParams struct {
 	Hits      string `form:"hits"`
 	IsEnd     string `form:"isend"`
 	Plot      string `form:"plot"`
+	Paging    int    `form:"paging"`
 }
 
 func main() {
@@ -77,8 +76,7 @@ func main() {
 	dsn := "root:@tcp(127.0.0.1:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		fmt.Println(errors.New(err.Error()))
-		return
+		panic(err)
 	}
 
 	//注册路由
@@ -106,7 +104,7 @@ func main() {
 		if params.Tag != "" {
 			tags := strings.Split(params.Tag, ",")
 			for _, tag := range tags {
-				query.Where("FIND_IN_SET(?, tags)", tag)
+				query.Where("tag like ？ ", tag)
 			}
 		}
 
@@ -114,18 +112,64 @@ func main() {
 			query.Where("level IN (?)", strings.Split(params.Level, ","))
 		}
 
+		if params.Area != "" {
+			query.Where("level = ?", params.Level)
+		}
+
+		if params.Lang != "" {
+			query.Where("lang = ?", params.Lang)
+		}
+
+		if params.Year != "" {
+			query.Where("year = ?", params.Year)
+		}
+
 		if params.IsEnd != "" {
 			query.Where("is_end = ?", params.IsEnd)
 		}
 
+		if params.State != "" {
+			query.Where("state = ?", params.State)
+		}
+
+		if params.Version != "" {
+			query.Where("version = ?", params.Version)
+		}
+
+		//时间相关查询
+		if params.Time != "" {
+			time := timeMap(params.Time)
+			query.Where("time >= ?", time)
+		}
+
+		//点击量
+
+		if params.HitsDay != "" {
+			conditionSlice := strings.Split(params.HitsDay, "")
+			condition := conditionSlice[0]
+			conditionValue := conditionSlice[1]
+			switch condition {
+			case "gt":
+				query.Where("hits >= ?", conditionValue)
+			case "lt":
+				query.Where("hits <= ?", conditionValue)
+			default:
+				query.Where("hits BETWEEN ? AND ?", condition, conditionValue)
+			}
+		}
+
+		//这里处理排序
 		if params.By != "" {
 			query.Order(clause.OrderByColumn{
 				Column: clause.Column{Name: params.By},
 				Desc:   params.Order == "desc",
 			})
 		}
+
 		//分页
-		query.Offset(params.Start).Limit(params.Num)
+		if params.Paging > 0 {
+			query.Offset(params.Start).Limit(params.Num)
+		}
 
 		//执行查询
 		var results []Movie
@@ -145,4 +189,19 @@ func main() {
 
 	//启动服务
 	r.Run(":8082")
+}
+
+func timeMap(timeV string) time.Time {
+	now := time.Now()
+	tMap := map[string]time.Time{
+		"一天前":  now.Add(-24 * time.Hour),
+		"一周前":  now.Add(-7 * 24 * time.Hour),
+		"一月":   now.Add(-30 * 24 * time.Hour),
+		"一小时前": now.Add(time.Hour),
+	}
+	value, ok := tMap[timeV]
+	if ok {
+		return value
+	}
+	return now
 }
